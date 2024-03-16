@@ -43,7 +43,6 @@ class Main extends PluginBase implements Listener
 
     public function onEnable(): void
     {
-        PluginDataFolderEraser::erase($this);
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
     }
 
