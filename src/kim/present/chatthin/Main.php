@@ -31,52 +31,63 @@ use pocketmine\event\Listener;
 use pocketmine\event\server\DataPacketSendEvent;
 use pocketmine\network\mcpe\protocol\AvailableCommandsPacket;
 use pocketmine\network\mcpe\protocol\TextPacket;
+use pocketmine\network\mcpe\protocol\types\command\raw\CommandRawData;
 use pocketmine\plugin\PluginBase;
 use pocketmine\utils\TextFormat;
 
 use function preg_replace;
 
-class Main extends PluginBase implements Listener
-{
+class Main extends PluginBase implements Listener{
+	public const THIN_TAG = TextFormat::ESCAPE . "\u{3000}";
 
-    public const THIN_TAG = TextFormat::ESCAPE . "\u{3000}";
+	public function onEnable() : void{
+		$this->getServer()->getPluginManager()->registerEvents($this, $this);
+	}
 
-    public function onEnable(): void
-    {
-        $this->getServer()->getPluginManager()->registerEvents($this, $this);
-    }
+	/**
+	 * @priority HIGHEST
+	 *
+	 * @param DataPacketSendEvent $event
+	 */
+	public function onDataPacketSendEvent(DataPacketSendEvent $event) : void{
+		foreach($event->getPackets() as $pk){
+			if($pk instanceof TextPacket){
+				switch($pk->type){
+					case TextPacket::TYPE_POPUP:
+					case TextPacket::TYPE_JUKEBOX_POPUP:
+					case TextPacket::TYPE_TIP:
+					case TextPacket::TYPE_TRANSLATION:
+						$pk->message = $this->toThin($pk->message);
+						break;
 
-    /**
-     * @priority HIGHEST
-     *
-     * @param DataPacketSendEvent $event
-     */
-    public function onDataPacketSendEvent(DataPacketSendEvent $event): void
-    {
-        foreach ($event->getPackets() as $pk) {
-            if ($pk instanceof TextPacket) {
-                switch ($pk->type) {
-                    case TextPacket::TYPE_POPUP:
-                    case TextPacket::TYPE_JUKEBOX_POPUP:
-                    case TextPacket::TYPE_TIP:
-                    case TextPacket::TYPE_TRANSLATION:
-                        $pk->message = $this->toThin($pk->message);
-                        break;
+					default:
+						$pk->message .= self::THIN_TAG;
+						break;
+				}
+			}elseif($pk instanceof AvailableCommandsPacket){
+				foreach($pk->commandData as $index => $commandData){
+					$description = $commandData->getDescription();
 
-                    default:
-                        $pk->message .= self::THIN_TAG;
-                        break;
-                }
-            } elseif ($pk instanceof AvailableCommandsPacket) {
-                foreach ($pk->commandData as $commandData) {
-                    $commandData->description = $this->toThin($commandData->description);
-                }
-            }
-        }
-    }
+					if($description == null || $description == ""){
+						$new = "-1";
+					}else{
+						$new = $this->toThin($description);
+					}
+					$pk->commandData[$index] = new CommandRawData(
+						$commandData->getName(),
+						$new,
+						$commandData->getFlags(),
+						$commandData->getPermission(),
+						$commandData->getAliasEnumIndex(),
+						$commandData->getChainedSubCommandDataIndexes(),
+						$commandData->getOverloads()
+					);
+				}
+			}
+		}
+	}
 
-    public function toThin(string $str): string
-    {
-        return preg_replace("/%*(([a-z0-9_]+\.)+[a-z0-9_]+)/i", "%$1", $str) . self::THIN_TAG;
-    }
+	public function toThin(string $str) : string{
+		return preg_replace("/%*(([a-z0-9_]+\.)+[a-z0-9_]+)/i", "%$1", $str) . self::THIN_TAG;
+	}
 }
